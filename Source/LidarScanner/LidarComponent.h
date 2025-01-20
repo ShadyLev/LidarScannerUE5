@@ -121,9 +121,9 @@ public:
 	int FullScanRayAmount = 40;
 	UPROPERTY(EditAnywhere ,Category="Full Scan")
 	float FullScanRate = 10.f;
-	UPROPERTY(EditAnywhere ,Category="Full Scan")
+	UPROPERTY(EditAnywhere ,Category="Full Scan", meta = (ClampMin = "0.0", ClampMax = "90.0", UIMin = "0.0", UIMax = "90.0"))
 	float FullScanVerticalAngle = 30.f;
-	UPROPERTY(EditAnywhere ,Category="Full Scan")
+	UPROPERTY(EditAnywhere, Category = "Full Scan", meta = (ClampMin = "0.0", ClampMax = "360.0", UIMin = "0.0", UIMax = "360.0"))
 	float FullScanHorizontalAngle = 30.f;
 
 	UFUNCTION(BlueprintCallable, Category = "Full Scan")
@@ -134,7 +134,7 @@ private:
 	bool FullScanInProgress;
 	void UpdateFullScan(float DeltaTime);
 	void PerformFullScan();
-	bool GetScanDirection(float VerticalAngle, float HorizontalDegrees, FHitResult& Hit) const;
+	FVector GetScanDirection(float VerticalAngle, float HorizontalDegrees, FRotator CameraRotation) const;
 
 private:
 	bool LineCast(const FVector& Start, const FVector& Direction, FHitResult& Hit) const;

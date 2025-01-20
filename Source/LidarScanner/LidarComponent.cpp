@@ -101,11 +101,6 @@ void ULidarComponent::NormalScan()
 			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, HitPosition.ToString());
 		}
 
-		// FParticleStruct Data;
-		// Data.Color = ParticleColor;
-		// Data.Position = HitPosition;
-		// Data.Lifetime =  99999.f;
-		// Particles.Add(Data);
 		HitPositions.Add(HitPosition);
 
 		if(FCustomParticleData Data; GetParticleDataFromTag(Hit.Component->ComponentTags,Data))
@@ -172,21 +167,14 @@ void ULidarComponent::UpdateFullScan(const float DeltaTime)
 	if (FullScanInProgress == false)
 		return;
 
-	if ((FullScanRate * DeltaTime) + FullScanCurrentAngle >= FullScanVerticalAngle)
+	if(FullScanCurrentAngle + FullScanRate * DeltaTime >= FullScanVerticalAngle)
 	{
-		FullScanCurrentAngle = -FullScanVerticalAngle;
 		FullScanInProgress = false;
-
-		if(EnableDebug)
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Purple, TEXT("FULL SCAN ENDED"));
-		
 		return;
 	}
 
 	FullScanCurrentAngle += FullScanRate * DeltaTime;
 
-	if(EnableDebug)
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("FULL SCAN IN PROGRESS"));
 
 	PerformFullScan();
 }
@@ -201,6 +189,10 @@ void ULidarComponent::PerformFullScan()
 	TArray<FLinearColor> ColorArray;
 	TArray<float> LifetimeArray;
 
+	HitPositions.Empty();
+	ColorArray.Empty();
+	LifetimeArray.Empty();
+
 	const float HorizontalStep = FullScanHorizontalAngle / static_cast<float>(FullScanRayAmount);
 
 	for (int i = 0; i < FullScanRayAmount; i++)
@@ -209,15 +201,13 @@ void ULidarComponent::PerformFullScan()
 
 		float RandomDeviation = FMath::RandRange(-HorizontalStep / 2, HorizontalStep / 2);
 		float YawDeg = BaseYaw + RandomDeviation;
-		
-		if (GetScanDirection(FullScanCurrentAngle, YawDeg, Hit))
-		{
-			// FParticleStruct Data;
-			// Data.Color = ParticleColor;
-			// Data.Position = Hit.Location;
-			// Data.Lifetime =  5.f;
-			// Particles.Add(Data);
 
+		const APlayerController* PlayerController = Cast<APlayerController>(Character->GetController());
+		const FRotator CameraRotation = PlayerController->PlayerCameraManager->GetCameraRotation();
+		const FVector StartLocation = GetOwner()->GetActorLocation() + CameraRotation.RotateVector(MuzzleOffset);
+		FVector Direction = GetScanDirection(FullScanCurrentAngle, YawDeg, CameraRotation);
+		if (LineCast(StartLocation, Direction, Hit))
+		{
 			// Every particle needs a position
 			HitPositions.Add(Hit.Location);
 
@@ -238,16 +228,11 @@ void ULidarComponent::PerformFullScan()
 	SetNiagaraParticleData(HitPositions, ColorArray, LifetimeArray);
 }
 
-bool ULidarComponent::GetScanDirection(float VerticalAngle, float HorizontalDegrees, FHitResult& Hit) const
+FVector ULidarComponent::GetScanDirection(float VerticalAngle, float HorizontalDegrees, FRotator CameraRotation) const
 {
 	const FRotator NewRotation(VerticalAngle, HorizontalDegrees, 0);
 
-	const APlayerController* PlayerController = Cast<APlayerController>(Character->GetController());
-	const FRotator CameraRotation = PlayerController->PlayerCameraManager->GetCameraRotation();
-	const FVector StartLocation = GetOwner()->GetActorLocation() + CameraRotation.RotateVector(MuzzleOffset);
-	const FVector Direction = NewRotation.RotateVector(FRotationMatrix(CameraRotation).GetUnitAxis(EAxis::X));
-	
-	return LineCast(StartLocation, Direction, Hit);
+	return NewRotation.RotateVector(FRotationMatrix(CameraRotation).GetUnitAxis(EAxis::X));	
 }
 
 
