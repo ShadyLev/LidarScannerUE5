@@ -68,10 +68,11 @@ void ULidarComponent::NormalScan()
 		return;
 	
 	FHitResult Hit;
-	Particles.Empty();
-	TArray<FVector> HitPositions;
-	TArray<FLinearColor> ColorArray;
-	TArray<float> LifetimeArray;
+
+	PositionArray.Empty();
+	ColorArray.Empty();
+	LifetimeArray.Empty();
+
 	for (int i = 0; i < ScanRayAmount; ++i)
 	{
 		const FVector2D RandomOffset = GetRandomPointInsideCircle(ScanRadius);
@@ -91,32 +92,10 @@ void ULidarComponent::NormalScan()
 		if (bHit == false)
 			continue;
 
-		FVector HitPosition = Hit.Location;
-
-		// DEBUG
-		if (EnableDebug)
-		{
-			DrawDebugLine(World, Start, HitPosition, FColor::Blue, false, LineTraceLinger);
-			DrawDebugSphere(World, HitPosition, 2.f, 2, FColor::Green);
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, HitPosition.ToString());
-		}
-
-		HitPositions.Add(HitPosition);
-
-		if(FCustomParticleData Data; GetParticleDataFromTag(Hit.Component->ComponentTags,Data))
-		{
-			ColorArray.Add(Data.Color);
-			LifetimeArray.Add(Data.Lifetime);
-			continue;
-		}
-
-		FLinearColor ParticleColor = LerpColors(Hit.Distance);
-		
-		ColorArray.Add(ParticleColor);
-		LifetimeArray.Add(DefaultParticleLifetime);
+		AddParticleData(Hit);
 	}
 
-	SetNiagaraParticleData(HitPositions, ColorArray, LifetimeArray);
+	SetNiagaraParticleData();
 }
 
 FVector2D ULidarComponent::GetRandomPointInsideCircle(float Radius)
@@ -155,6 +134,9 @@ FLinearColor ULidarComponent::LerpColors(float Distance)
 
 void ULidarComponent::StartFullScan()
 {
+	if (FullScanInProgress)
+		return;
+
 	FullScanCurrentAngle = -FullScanVerticalAngle;
 	FullScanInProgress = true;
 
@@ -185,14 +167,11 @@ void ULidarComponent::PerformFullScan()
 		return;
 
 	FHitResult Hit;
-	TArray<FVector> HitPositions;
-	TArray<FLinearColor> ColorArray;
-	TArray<float> LifetimeArray;
 
-	HitPositions.Empty();
+	PositionArray.Empty();
 	ColorArray.Empty();
 	LifetimeArray.Empty();
-
+	
 	const float HorizontalStep = FullScanHorizontalAngle / static_cast<float>(FullScanRayAmount);
 
 	for (int i = 0; i < FullScanRayAmount; i++)
@@ -208,24 +187,11 @@ void ULidarComponent::PerformFullScan()
 		FVector Direction = GetScanDirection(FullScanCurrentAngle, YawDeg, CameraRotation);
 		if (LineCast(StartLocation, Direction, Hit))
 		{
-			// Every particle needs a position
-			HitPositions.Add(Hit.Location);
-
-			if(FCustomParticleData Data; GetParticleDataFromTag(Hit.Component->ComponentTags,Data))
-			{
-				ColorArray.Add(Data.Color);
-				LifetimeArray.Add(Data.Lifetime);
-				continue;
-			}
-
-			// Default behaviour
-			FLinearColor ParticleColor = LerpColors(Hit.Distance);
-			ColorArray.Add(ParticleColor);
-			LifetimeArray.Add(DefaultParticleLifetime);
+			AddParticleData(Hit);
 		}
 	}
 	
-	SetNiagaraParticleData(HitPositions, ColorArray, LifetimeArray);
+	SetNiagaraParticleData();
 }
 
 FVector ULidarComponent::GetScanDirection(float VerticalAngle, float HorizontalDegrees, FRotator CameraRotation) const
@@ -237,6 +203,24 @@ FVector ULidarComponent::GetScanDirection(float VerticalAngle, float HorizontalD
 
 
 #pragma endregion
+
+void ULidarComponent::AddParticleData(FHitResult& Hit)
+{
+	// Every particle needs a position
+	PositionArray.Add(Hit.Location);
+
+	if (FCustomParticleData Data; GetParticleDataFromTag(Hit.Component->ComponentTags, Data))
+	{
+		ColorArray.Add(Data.Color);
+		LifetimeArray.Add(Data.Lifetime);
+		return;
+	}
+
+	// Default behaviour
+	FLinearColor ParticleColor = LerpColors(Hit.Distance);
+	ColorArray.Add(ParticleColor);
+	LifetimeArray.Add(DefaultParticleLifetime);
+}
 
 bool ULidarComponent::GetParticleDataFromTag(TArray<FName>& Tags, FCustomParticleData& Data)
 {
@@ -266,6 +250,7 @@ bool ULidarComponent::LineCast(const FVector& Start, const FVector& Direction, F
 	{
 		if (bHit)
 		{
+			DrawDebugSphere(GetWorld(), Hit.Location, 2.f, 2, FColor::Green, false, LineTraceLinger);
 			DrawDebugLine(GetWorld(), Start, Hit.Location, FColor::Green, false, LineTraceLinger);
 		}
 		else
@@ -293,14 +278,14 @@ void ULidarComponent::InitializeNiagaraSystem()
 	}
 }
 
-void ULidarComponent::SetNiagaraParticleData(TArray<FVector>& Positions, TArray<FLinearColor>& Colors, TArray<float>& Lifetimes)
+void ULidarComponent::SetNiagaraParticleData()
 {
 	if (NiagaraComponent)
 	{
 		// We should make these variables exposed to BP maybe, dont like it hardcoded like this
-		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector(NiagaraComponent, "ParticlePositions", Positions);
-		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayColor(NiagaraComponent, "ParticleColors", Colors);
-		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComponent, "ParticleLifetimes", Lifetimes);
+		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector(NiagaraComponent, "ParticlePositions", PositionArray);
+		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayColor(NiagaraComponent, "ParticleColors", ColorArray);
+		UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComponent, "ParticleLifetimes", LifetimeArray);
 	}
 }
 

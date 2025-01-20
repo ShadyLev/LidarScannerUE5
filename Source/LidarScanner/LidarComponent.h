@@ -73,7 +73,7 @@ public:
 	float DefaultParticleLifetime = 99999.f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VFX")
-	float ParticleColorMaxDistance;
+	float ParticleColorMaxDistance = 800.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VFX")
 	FLinearColor ParticleColorClose;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VFX")
@@ -83,7 +83,7 @@ public:
 	TMap<FName, FCustomParticleData> CustomDataDictionary;
 
 	UFUNCTION(BlueprintCallable)
-	void SetNiagaraParticleData(TArray<FVector>& Positions, TArray<FLinearColor>& Colors, TArray<float>& Lifetimes);
+	void SetNiagaraParticleData();
 
 	UFUNCTION(BlueprintCallable)
 	void InitializeNiagaraSystem();
@@ -93,7 +93,13 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	bool GetParticleDataFromTag(TArray<FName>& Tags, FCustomParticleData& Data);
+
+	UFUNCTION(BlueprintCallable)
+	void AddParticleData(FHitResult& Hit);
 private:
+	TArray<FVector> PositionArray;
+	TArray<FLinearColor> ColorArray;
+	TArray<float> LifetimeArray;
 
 public:
 	UPROPERTY(EditAnywhere ,Category="Normal Scan")
